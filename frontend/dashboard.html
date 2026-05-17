@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard — Crypto Portfolio</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+
+<!-- Custom Dialog -->
+<div id="confirm-overlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:1000; justify-content:center; align-items:center;">
+    <div style="background:#161b22; border:1px solid #30363d; border-radius:14px; padding:32px; width:360px;">
+        <p id="dialog-title" style="font-size:15px; font-weight:600; color:#e8edf5; margin-bottom:6px;"></p>
+        <p id="dialog-sub" style="font-size:12px; color:#6b7280; margin-bottom:20px;"></p>
+
+        <div id="sell-qty-row" style="display:none; margin-bottom:20px;">
+            <label style="font-size:11px; font-weight:500; color:#6b7280; text-transform:uppercase; letter-spacing:0.5px; display:block; margin-bottom:7px;">Quantity to Sell</label>
+            <input type="number" id="sell-qty-input" step="any" min="0.00001"
+                style="width:100%; padding:10px 13px; background:rgba(255,255,255,0.04); border:1px solid #30363d; border-radius:9px; color:#e8edf5; font-size:14px; outline:none;" />
+            <p id="sell-qty-error" style="color:#f87171; font-size:12px; margin-top:6px; display:none;">Please enter a valid quantity</p>
+        </div>
+
+        <div style="display:flex; gap:10px;">
+            <button id="confirm-ok" style="flex:1; padding:10px; background:#f0c75e; color:#0d1117; border:none; border-radius:9px; font-weight:600; cursor:pointer; font-size:13px;">Confirm</button>
+            <button id="confirm-cancel" style="flex:1; padding:10px; background:none; border:1px solid #30363d; color:#6b7280; border-radius:9px; cursor:pointer; font-size:13px;">Cancel</button>
+        </div>
+    </div>
+</div>
+<body>
+
+    <nav class="navbar">
+    <div class="logo">Crypto Portfolio</div>
+    <div class="user-info">
+        <span id="user-email"></span>
+        <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme"></button>
+        <button class="logout-btn" onclick="logout()">Logout</button>
+    </div>
+</nav>
+
+    <div class="container">
+
+        <!-- SUMMARY CARDS -->
+        <div class="summary-grid">
+            <div class="summary-card">
+                <div class="label">TOTAL INVESTED</div>
+                <div class="value" id="total-invested">—</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">CURRENT VALUE</div>
+                <div class="value" id="total-value">—</div>
+            </div>
+            <div class="summary-card">
+                <div class="label">TOTAL P&L</div>
+                <div class="value" id="total-pnl">—</div>
+            </div>
+        </div>
+
+        <!-- ADD HOLDING -->
+        <div class="section-title">Add Holding</div>
+        <div class="add-form-card">
+            <div class="add-form-grid">
+                <div>
+                    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:5px;">Coin</label>
+                    <select id="coin-select">
+                        <option value="BTC">BTC — Bitcoin</option>
+                        <option value="ETH">ETH — Ethereum</option>
+                        <option value="BNB">BNB — Binance Coin</option>
+                        <option value="SOL">SOL — Solana</option>
+                        <option value="XRP">XRP — Ripple</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:5px;">Quantity</label>
+                    <input type="number" id="quantity" placeholder="0.5" step="any" min="0" />
+                </div>
+                <div>
+                    <label style="font-size:12px;color:#8b949e;display:block;margin-bottom:5px;">Buy Price (USD)</label>
+                    <input type="number" id="buy-price" placeholder="45000" step="any" min="0" />
+                </div>
+                <div>
+                    <button class="add-btn" onclick="addHolding()">+ Add</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- LIVE PRICES -->
+        <div class="section-title">Live Prices <span style="font-size:11px;color:#8b949e;font-weight:400;text-transform:none;letter-spacing:0;">— click a coin to see 7-day chart</span></div>
+        <div class="table-wrap" style="margin-bottom:12px;">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Coin</th>
+                        <th>Price (USD)</th>
+                    </tr>
+                </thead>
+                <tbody id="prices-body">
+                    <tr><td colspan="2" class="loading">Loading prices...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- CHART PANEL -->
+        <div id="chart-panel" style="display:none;background:#161b22;border:1px solid #30363d;border-radius:10px;padding:24px;margin-bottom:28px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                <div style="font-size:14px;font-weight:600;color:#e6edf3;" id="chart-title">Chart</div>
+                <button onclick="closeChart()" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:18px;">✕</button>
+            </div>
+            <canvas id="price-chart" height="100"></canvas>
+        </div>
+
+        <!-- PORTFOLIO -->
+        <div class="section-title">My Portfolio</div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Coin</th>
+                        <th>Quantity</th>
+                        <th>Buy Price</th>
+                        <th>Current Price</th>
+                        <th>Current Value</th>
+                        <th>P&L</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="portfolio-body">
+                    <tr><td colspan="7" class="loading">Loading portfolio...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- TRANSACTIONS -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+    <div class="section-title" style="margin-bottom:0;">Transaction History</div>
+    <div style="display:flex;gap:8px;align-items:center;">
+        <span style="font-size:12px;color:#8b949e;" id="tx-page-info"></span>
+        <button onclick="changeTxPage(-1)" id="tx-prev"
+            style="background:none;border:1px solid #30363d;color:#8b949e;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
+            ← Prev
+        </button>
+        <button onclick="changeTxPage(1)" id="tx-next"
+            style="background:none;border:1px solid #30363d;color:#8b949e;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:12px;">
+            Next →
+        </button>
+    </div>
+</div>
+<div class="table-wrap">
+    <table>
+        <thead>
+            <tr>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Coin</th>
+                <th>Quantity</th>
+                <th>Price</th>
+                <th>Total Value</th>
+            </tr>
+        </thead>
+        <tbody id="transactions-body">
+            <tr><td colspan="6" class="loading">Loading transactions...</td></tr>
+        </tbody>
+    </table>
+</div>
+<!-- CUSTOM MODAL -->
+<div id="modal-overlay" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.6);z-index:1000;justify-content:center;align-items:center;">
+    <div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px;width:340px;">
+        <div id="modal-title" style="font-size:15px;font-weight:600;color:#e6edf3;margin-bottom:6px;"></div>
+        <div id="modal-subtitle" style="font-size:12px;color:#8b949e;margin-bottom:16px;"></div>
+        <input id="modal-input" type="number" step="any" min="0"
+            style="width:100%;padding:10px 12px;background:#0d1117;border:1px solid #30363d;border-radius:8px;color:#e6edf3;font-size:14px;outline:none;margin-bottom:16px;"
+            placeholder="Enter quantity" />
+        <div style="display:flex;gap:10px;justify-content:flex-end;">
+            <button id="modal-cancel"
+                style="padding:8px 18px;background:none;border:1px solid #30363d;color:#8b949e;border-radius:8px;cursor:pointer;font-size:13px;">
+                Cancel
+            </button>
+            <button id="modal-confirm"
+                style="padding:8px 18px;background:#ff7b72;border:none;color:#fff;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">
+                Sell
+            </button>
+        </div>
+    </div>
+</div>
+    </div>
+
+    <script>
+        let currentTxPage = 1;
+        const TX_LIMIT = 10;
+        const API = "http://localhost:8000";
+        const token = localStorage.getItem("token");
+        if (!token) window.location.href = "login.html";
+
+        document.getElementById("user-email").textContent = localStorage.getItem("email") || "";
+
+        let chartInstance = null;
+
+        function logout() {
+    localStorage.removeItem("token");
+    localStorage.removeItem("email");
+    window.location.href = "login.html";
+}
+function showAlert(msg) {
+    const overlay = document.getElementById("confirm-overlay");
+    document.getElementById("dialog-title").textContent = msg;
+    document.getElementById("dialog-sub").textContent = "";
+    document.getElementById("sell-qty-row").style.display = "none";
+    document.getElementById("confirm-ok").textContent = "OK";
+    document.getElementById("confirm-ok").style.background = "#f0c75e";
+    overlay.style.display = "flex";
+
+    document.getElementById("confirm-ok").onclick = () => {
+        overlay.style.display = "none";
+    };
+    document.getElementById("confirm-cancel").style.display = "none";
+
+    document.getElementById("confirm-overlay").onclick = (e) => {
+        if (e.target === overlay) {
+            overlay.style.display = "none";
+            document.getElementById("confirm-cancel").style.display = "flex";
+        }
+    };
+}
+// ADD THIS RIGHT HERE
+function toggleTheme() {
+    document.body.classList.toggle('light');
+    localStorage.setItem('theme', document.body.classList.contains('light') ? 'light' : 'dark');
+}
+if (localStorage.getItem('theme') === 'light') document.body.classList.add('light');
+
+        function authHeaders() {
+            return {
+                "Authorization": "Bearer " + token,
+                "Content-Type": "application/json"
+            };
+        }
+
+        function logout() {
+            localStorage.removeItem("token");
+            localStorage.removeItem("email");
+            window.location.href = "login.html";
+        }
+
+        function fmt(num) {
+            return "$" + Number(num).toLocaleString("en-US", {
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2
+            });
+        }
+
+        async function loadPrices() {
+            try {
+                const res = await fetch(`${API}/prices/`);
+                const data = await res.json();
+                const tbody = document.getElementById("prices-body");
+                tbody.innerHTML = Object.entries(data).map(([coin, price]) =>
+                    `<tr style="cursor:pointer;" onclick="showChart('${coin}')"
+                        onmouseover="this.style.background='#0000000F'"
+                        onmouseout="this.style.background=''">
+                        <td><strong>${coin}</strong></td>
+                        <td>${fmt(price)}</td>
+                    </tr>`
+                ).join("");
+            } catch {
+                document.getElementById("prices-body").innerHTML =
+                    `<tr><td colspan="2" class="empty-state">Could not load prices</td></tr>`;
+            }
+        }
+
+        async function showChart(symbol) {
+            document.getElementById("chart-panel").style.display = "block";
+            document.getElementById("chart-title").textContent = `${symbol} — 7 Day Price`;
+            document.getElementById("chart-panel").scrollIntoView({ behavior: "smooth", block: "start" });
+
+            try {
+                const res = await fetch(`${API}/prices/history/${symbol}`);
+                const data = await res.json();
+
+                if (chartInstance) chartInstance.destroy();
+
+                const ctx = document.getElementById("price-chart").getContext("2d");
+                const isUp = data.prices[data.prices.length - 1] >= data.prices[0];
+
+                chartInstance = new Chart(ctx, {
+                    type: "line",
+                    data: {
+                        labels: data.labels,
+                        datasets: [{
+                            label: `${symbol} Price (USD)`,
+                            data: data.prices,
+                            borderColor: isUp ? "#39d353" : "#ff7b72",
+                            backgroundColor: isUp
+                                ? "rgba(57,211,83,0.08)"
+                                : "rgba(255,123,114,0.08)",
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            pointBackgroundColor: isUp ? "#39d353" : "#ff7b72",
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: ctx => " $" + ctx.parsed.y.toLocaleString()
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: { color: "#8b949e", font: { size: 11 } },
+                                grid: { color: "#21262d" }
+                            },
+                            y: {
+                                ticks: {
+                                    color: "#8b949e",
+                                    font: { size: 11 },
+                                    callback: v => "$" + v.toLocaleString()
+                                },
+                                grid: { color: "#21262d" }
+                            }
+                        }
+                    }
+                });
+            } catch {
+                document.getElementById("chart-title").textContent = "Could not load chart";
+            }
+        }
+
+        function closeChart() {
+            document.getElementById("chart-panel").style.display = "none";
+            if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+        }
+
+async function loadPortfolio() {
+    try {
+        const res = await fetch(`${API}/portfolio/`, { headers: authHeaders() });
+        
+        if (!res.ok) {
+            throw new Error("Failed to load portfolio");
+        }
+
+        const data = await res.json();
+
+        document.getElementById("total-invested").textContent = fmt(data.total_invested ?? 0);
+        document.getElementById("total-value").textContent = fmt(data.total_current_value ?? 0);
+
+        const pnl = data.total_profit_loss ?? 0;
+        const pnlEl = document.getElementById("total-pnl");
+        pnlEl.textContent = (pnl >= 0 ? "+" : "") + fmt(pnl);
+        pnlEl.className = "value " + (pnl >= 0 ? "green" : "red");
+
+        const tbody = document.getElementById("portfolio-body");
+        if (!data.holdings || data.holdings.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="7" class="empty-state">No holdings yet — add one above</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = data.holdings.map(h => {
+            const isProfit = h.profit_loss >= 0;
+            const sign = isProfit ? "+" : "";
+            return `<tr>
+                <td><strong>${h.coin_symbol}</strong></td>
+                <td>${h.quantity}</td>
+                <td>${fmt(h.buy_price_usd)}</td>
+                <td>${fmt(h.current_price)}</td>
+                <td>${fmt(h.current_value)}</td>
+                <td>
+                    <span class="badge ${isProfit ? 'green' : 'red'}">
+                        ${sign}${fmt(h.profit_loss)} (${sign}${h.profit_loss_pct}%)
+                    </span>
+                </td>
+                <td>
+                    <button onclick="removeHolding('${h.id}', '${h.coin_symbol}', ${h.quantity})"
+                        style="background:none;border:none;color:#ff7b72;cursor:pointer;font-size:12px;">
+                        Sell
+                    </button>
+                </td>
+            </tr>`;
+        }).join("");
+
+    } catch (err) {
+        console.error("Portfolio error:", err);
+        document.getElementById("portfolio-body").innerHTML =
+            `<tr><td colspan="7" class="empty-state">Could not load portfolio</td></tr>`;
+        document.getElementById("total-invested").textContent = "$0.00";
+        document.getElementById("total-value").textContent = "$0.00";
+        document.getElementById("total-pnl").textContent = "$0.00";
+    }
+}
+async function loadTransactions(page = 1) {
+    try {
+        const res = await fetch(`${API}/transactions/?page=${page}&limit=${TX_LIMIT}`, {
+            headers: authHeaders()
+        });
+
+        if (!res.ok) throw new Error("Failed");
+
+        const data = await res.json();
+        const list = data.transactions ?? data;
+        const totalPages = data.total_pages ?? 1;
+        currentTxPage = page;
+
+        // update page info
+        document.getElementById("tx-page-info").textContent = `Page ${page} of ${totalPages}`;
+        document.getElementById("tx-prev").style.opacity = page <= 1 ? "0.3" : "1";
+        document.getElementById("tx-next").style.opacity = page >= totalPages ? "0.3" : "1";
+
+        const tbody = document.getElementById("transactions-body");
+
+        if (!list || list.length === 0) {
+            tbody.innerHTML = `<tr><td colspan="6" class="empty-state">No transactions yet</td></tr>`;
+            return;
+        }
+
+        tbody.innerHTML = list.map(t => `<tr>
+            <td>${t.date}</td>
+            <td><span class="badge ${t.type === 'add' ? 'green' : 'red'}">${t.type}</span></td>
+            <td>${t.coin}</td>
+            <td>${t.quantity}</td>
+            <td>${fmt(t.price_at_time)}</td>
+            <td>${fmt(t.total_value)}</td>
+        </tr>`).join("");
+
+    } catch (err) {
+        console.error("Transactions error:", err);
+        document.getElementById("transactions-body").innerHTML =
+            `<tr><td colspan="6" class="empty-state">Could not load transactions</td></tr>`;
+    }
+}
+
+function changeTxPage(direction) {
+    loadTransactions(currentTxPage + direction);
+}
+
+        async function addHolding() {
+            const coin = document.getElementById("coin-select").value;
+            const quantity = parseFloat(document.getElementById("quantity").value);
+            const buyPrice = parseFloat(document.getElementById("buy-price").value);
+
+            if (!quantity || !buyPrice || quantity <= 0 || buyPrice <= 0) {showAlert("Please enter a valid quantity and buy price");
+            return;
+        }
+
+            try {
+                const res = await fetch(`${API}/portfolio/add`, {
+                    method: "POST",
+                    headers: authHeaders(),
+                    body: JSON.stringify({
+                        coin_symbol: coin,
+                        quantity: quantity,
+                        buy_price_usd: buyPrice
+                    })
+                });
+
+                if (res.ok) {
+                    document.getElementById("quantity").value = "";
+                    document.getElementById("buy-price").value = "";
+                    loadPortfolio();
+                    loadTransactions();
+                }
+            } catch {
+                alert("Failed to add holding");
+            }
+        }
+function sellHolding(id, coin, currentPrice, maxQty) {
+    const overlay = document.getElementById("confirm-overlay");
+    overlay.style.display = "flex";
+
+    document.getElementById("dialog-title").textContent = `Sell ${coin}`;
+    document.getElementById("dialog-sub").textContent = `Current price: ${fmt(currentPrice)} — Max: ${maxQty}`;
+    document.getElementById("sell-qty-row").style.display = "block";
+    document.getElementById("sell-qty-input").value = "";
+    document.getElementById("sell-qty-input").max = maxQty;
+    document.getElementById("sell-qty-error").style.display = "none";
+    document.getElementById("confirm-ok").textContent = "Sell";
+    document.getElementById("confirm-ok").style.background = "#f0c75e";
+
+    document.getElementById("confirm-ok").onclick = async () => {
+        const qty = parseFloat(document.getElementById("sell-qty-input").value);
+        const errEl = document.getElementById("sell-qty-error");
+
+        if (!qty || qty <= 0 || qty > maxQty) {
+            errEl.textContent = qty > maxQty
+                ? `Max quantity is ${maxQty}`
+                : "Please enter a valid quantity";
+            errEl.style.display = "block";
+            return;
+        }
+
+        errEl.style.display = "none";
+        overlay.style.display = "none";
+
+        try {
+            const res = await fetch(`${API}/portfolio/sell/${id}`, {
+                method: "POST",
+                headers: authHeaders(),
+                body: JSON.stringify({ quantity: qty })
+            });
+
+            if (!res.ok) {
+                const err = await res.json();
+                alert(err.detail || "Failed to sell");
+                return;
+            }
+
+            loadPortfolio();
+            loadTransactions();
+        } catch {
+            alert("Failed to sell holding");
+        }
+    };
+
+    document.getElementById("confirm-cancel").onclick = () => {
+        overlay.style.display = "none";
+    };
+}
+function showModal(title, subtitle, onConfirm) {
+    const overlay = document.getElementById("modal-overlay");
+    overlay.style.display = "flex";
+    document.getElementById("modal-title").textContent = title;
+    document.getElementById("modal-subtitle").textContent = subtitle;
+    document.getElementById("modal-input").value = "";
+    document.getElementById("modal-input").focus();
+
+    document.getElementById("modal-confirm").onclick = () => {
+        const val = parseFloat(document.getElementById("modal-input").value);
+        onConfirm(val);
+    };
+
+    document.getElementById("modal-cancel").onclick = () => {
+        overlay.style.display = "none";
+    };
+}
+
+async function removeHolding(id, coin, maxQty) {
+    showModal(
+        `Sell ${coin}`,
+        `How many do you want to Sell? (You have: ${maxQty})`,
+        async (qty) => {
+            const overlay = document.getElementById("modal-overlay");
+
+            if (isNaN(qty) || qty <= 0) {
+                alert("Please enter a valid quantity");
+                return;
+            }
+            if (qty > maxQty) {
+                alert(`You only have ${maxQty} ${coin}`);
+                return;
+            }
+
+            overlay.style.display = "none";
+
+            try {
+                const res = await fetch(`${API}/portfolio/remove/${id}`, {
+                    method: "DELETE",
+                    headers: authHeaders(),
+                    body: JSON.stringify({ quantity: qty })
+                });
+
+                if (res.ok) {
+                    loadPortfolio();
+                    loadTransactions(currentTxPage);
+                } else {
+                    const err = await res.json();
+                    alert(err.detail || "Failed to Sell");
+                }
+            } catch {
+                alert("Failed to Sell holding");
+            }
+        }
+    );
+}
+
+        loadPrices();
+        loadPortfolio();
+        loadTransactions(1);
+        setInterval(loadPrices, 30000);
+        setInterval(loadPortfolio, 30000);
+    </script>
+</body>
+</html>
